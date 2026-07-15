@@ -1,0 +1,17 @@
+[project]
+name = "kings-hospital-voice-bot-token-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+# Kept identical to requirements.txt on purpose: Vercel's Python runtime can
+# read dependencies from either file and the precedence between them isn't
+# documented, so both list the same lightweight deps to be safe. Do not add
+# agent.py's dependencies (livekit-agents, Google plugins, Silero) here.
+dependencies = [
+    "Flask==3.1.3",
+    "flask-cors==6.0.5",
+    "livekit-api==1.2.0",
+    "python-dotenv==1.2.2",
+]
+
+[tool.vercel]
+entrypoint = "api.livekit_token:app"
