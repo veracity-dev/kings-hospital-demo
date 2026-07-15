@@ -32,8 +32,8 @@ and the agent don't need to change.
 | `seed.py` | Populates `hospital.db` with sample doctors/sessions |
 | `tools.py` | LiveKit function-tools the agent calls to query the DB |
 | `agent.py` | The LiveKit Agents worker (STT → LLM → TTS pipeline) — **runs on a persistent host, not Vercel** (see Deployment) |
-| `token_server.py` | Local Flask server that mints LiveKit room tokens, for local dev only |
-| `api/livekit_token.py` | Same token logic, packaged as a Vercel serverless function |
+| `token_server.py` | Local FastAPI + uvicorn server that mints LiveKit room tokens, for local dev only |
+| `api/index.py` | Same token logic as a FastAPI app, deployed to Vercel |
 | `public/index.html` | Minimal browser client (mic button + live transcript) |
 | `requirements.txt` | Lightweight deps for the token server / Vercel function only |
 | `agent-requirements.txt` | Full deps for `agent.py` (livekit-agents, Google plugins, Silero) |
@@ -128,11 +128,26 @@ serverless platform (Vercel included) supports. So deployment splits in two:
 ### Part 1 — Web client + token endpoint on Vercel
 
 This repo is already structured for zero-config Vercel deployment:
-`public/index.html` is served as the static site, and `api/livekit_token.py`
-becomes a serverless function at `/api/livekit_token` (Vercel maps one
-function per file under `/api`). The root `requirements.txt` — the
-lightweight one — is what Vercel installs; `agent-requirements.txt` is
-listed in `.vercelignore` so it's never even uploaded.
+`public/index.html` is served as the static site, and `api/index.py` — a
+FastAPI app — becomes a single Vercel Function serving `/api/livekit_token`.
+`index.py` is one of Vercel's recognized entrypoint filenames (along with
+`app.py`, `server.py`, `main.py`, `wsgi.py`, `asgi.py`), which is why it's
+not named `livekit_token.py` — an arbitrary filename wouldn't be
+auto-detected. The root `requirements.txt` — the lightweight one — is what
+Vercel installs; `agent-requirements.txt` is listed in `.vercelignore` so
+it's never even uploaded.
+
+Per Vercel's docs, requests matching a real file under `public/**` (like
+`/` → `public/index.html`) are served by their CDN before ever reaching the
+FastAPI app — only unmatched paths, like `/api/livekit_token`, do. This is
+the documented, supported pattern, but verify `/` still loads the web
+client correctly on your first deploy (ideally a preview deploy) before
+relying on it — it's a different code path than a plain per-file function,
+and an earlier attempt at this (routing everything through a Flask app via
+a custom `pyproject.toml` entrypoint) broke static serving entirely. If `/`
+ever 404s again, the fix that's known to work is reverting `api/index.py`
+to a plain `BaseHTTPRequestHandler`-based `handler` class (see git history)
+scoped only to its own route.
 
 1. Push this repo to GitHub (or GitLab/Bitbucket), then import it in the
    [Vercel dashboard](https://vercel.com/new) — no build settings needed.
